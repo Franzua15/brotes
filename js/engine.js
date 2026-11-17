@@ -396,14 +396,14 @@
       const next = c.kind === "action" ? "block" : "blocked";
       return requireLoss(s, challenger.id, "desafío fallido", next);
     }
-    log(s, "🤥 ¡" + claimant.name + " mentía! No tenía " + roleLabel(c.role) + ".");
+    log(s, "🦊 ¡Era astucia! " + claimant.name + " no tenía " + roleLabel(c.role) + ".");
     if (c.kind === "action") {
       // La acción falla. Se devuelve lo pagado (Cactus).
       if (s.pending.paid) claimant.water += s.pending.paid;
-      return requireLoss(s, claimant.id, "pillado mintiendo", "end");
+      return requireLoss(s, claimant.id, "lo descubrieron", "end");
     }
     // Era un bloqueo falso: el bloqueo falla y la acción sigue.
-    return requireLoss(s, claimant.id, "pillado mintiendo", "resolve");
+    return requireLoss(s, claimant.id, "lo descubrieron", "resolve");
   }
 
   function doBlock(s, m) {

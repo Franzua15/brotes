@@ -4,11 +4,11 @@ Juego de cartas de faroles para 2 a 10 jugadores. Cada jugador cuida un jardín 
 
 ## Estado actual
 
-**Prototipo en modo prueba**: todos los jugadores comparten la misma pantalla. Sirve para comprobar que las reglas funcionan antes de conectar varios móviles.
+**Prototipo en modo prueba**: se juega pasando el móvil. Antes de cada turno aparece "Pásale el móvil a…" para que nadie vea las cartas de otro. Sirve para comprobar que las reglas funcionan antes de conectar varios móviles.
 
 - Motor de reglas completo: acciones, desafíos, bloqueos, Enredadera, Abono y Exterminar obligatorio.
 - Botón **📖 Guía** con las cartas para pasar deslizando, y reglas rápidas.
-- Botón **👁 Mis cartas** en cada jugador para mirar las propias.
+- Mesa con los jugadores alrededor, el mazo y el manantial al centro, tus cartas abajo, tu contador de gotas y 4 botones: 💧 refrescarse, 💧💧 ayuda, 🎯 exterminar y ⭐ habilidad (las que no tienes se usan con **astucia**).
 
 Pendiente: modo online (cada uno en su móvil, salas con código) y APK de Android.
 

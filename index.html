@@ -15,7 +15,7 @@
 <section id="setup" class="screen">
   <img class="logo-big" src="assets/logo.webp" alt="Brotes">
   <div class="setup-box">
-    <p class="mode">🧪 Modo prueba: todos juegan en esta pantalla</p>
+    <p class="mode">🧪 Modo prueba: se juega pasando el móvil</p>
     <h2>¿Cuántos jugadores?</h2>
     <div id="countChips" class="chips"></div>
     <div id="names" class="names"></div>
@@ -25,16 +25,29 @@
 </section>
 
 <!-- Partida -->
-<section id="game" class="screen" hidden>
-  <header class="bar">
-    <img src="assets/logo.webp" alt="Brotes" class="logo-small">
-    <span id="roundInfo" class="round"></span>
-    <button class="icon-btn" data-open-guide aria-label="Guía de personajes">📖<span>Guía</span></button>
-    <button class="icon-btn" id="menuBtn" aria-label="Menú">⚙️</button>
-  </header>
-  <div id="event" class="event" role="status" aria-live="polite"></div>
-  <main id="table" class="table"></main>
-  <section id="panel" class="panel"></section>
+<section id="game" class="board" hidden>
+  <div class="hud-top">
+    <span id="roundInfo" class="pill"></span>
+    <div id="event" class="event" role="status" aria-live="polite"></div>
+    <button class="round-btn" data-open-guide aria-label="Guía de personajes">📖</button>
+    <button class="round-btn" id="menuBtn" aria-label="Opciones">⚙️</button>
+  </div>
+
+  <div class="center" aria-label="Mazo y manantial">
+    <div class="deck"><img src="assets/ui/mazo.webp" alt=""><span id="deckCount" class="deck-count"></span></div>
+    <img class="spring" src="assets/ui/gota.webp" alt="Manantial">
+  </div>
+
+  <div id="seats"></div>
+
+  <div id="me" class="me"></div>
+
+  <div id="water" class="water-badge" aria-label="Tus gotas"></div>
+
+  <div id="actions" class="actions"></div>
+
+  <div id="dialog" class="dialog" hidden></div>
+  <div id="curtain" class="curtain" hidden></div>
 </section>
 
 <!-- Guía deslizable -->
