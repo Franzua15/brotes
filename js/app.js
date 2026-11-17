@@ -137,11 +137,32 @@
     ev.textContent = S.lastEvent || "";
     ev.classList.remove("flash"); void ev.offsetWidth; ev.classList.add("flash");
     $("deckCount").textContent = S.deck.length;
+    placeDeck();
     renderSeats(me);
     renderMe(me);
     renderActions(me);
     renderDialog(me);
     renderCurtain(me);
+  }
+
+  // Pone el mazo justo en el centro del círculo de piedra del fondo.
+  // El fondo se ajusta tipo "cover", así que se calcula dónde cae ese punto en esta pantalla.
+  const BG = { w: 1600, h: 901, cx: 0.495, cy: 0.425 };
+  function placeDeck() {
+    const W = innerWidth, H = innerHeight;
+    const scale = Math.max(W / BG.w, H / BG.h);
+    const x = (W - BG.w * scale) / 2 + BG.cx * BG.w * scale;
+    const y = (H - BG.h * scale) / 2 + BG.cy * BG.h * scale;
+    // En pantallas muy bajas tus cartas lo taparían: se mueve a la izquierda, aún dentro del círculo.
+    if (H < 520 && W > H) {
+      const c = document.querySelector(".center");
+      c.style.left = (x - BG.w * scale * 0.11) + "px";
+      c.style.top = y + "px";
+      return;
+    }
+    const c = document.querySelector(".center");
+    c.style.left = x + "px";
+    c.style.top = y + "px";
   }
 
   function vineInfo() {
