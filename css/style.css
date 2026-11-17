@@ -333,3 +333,31 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
   .abtn img { height: 56px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+/* ---------- inicio online y sala de espera ---------- */
+#home, #lobby {
+  height: 100dvh; overflow: auto;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px;
+  padding: calc(16px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom));
+}
+.logo-mid { width: min(70vw, 340px); filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .3)); }
+.name-input.wide { width: 100%; text-align: center; font-size: 1.1rem; }
+.or { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: .85rem; font-weight: 500; }
+.or::before, .or::after { content: ""; flex: 1; height: 2px; background: #e3d3ad; }
+.join-row { display: flex; gap: 8px; }
+.join-row .btn { flex: none; }
+.code-input { flex: 1; text-align: center; font-size: 1.3rem; letter-spacing: .25em; text-transform: uppercase; font-weight: 700; }
+.big-code {
+  font: 700 2.6rem/1 "Fredoka", sans-serif; letter-spacing: .18em; color: var(--navy);
+  background: #fff; border: 3px dashed var(--leaf); border-radius: 16px; padding: 10px 6px 10px 14px;
+}
+.lobby-players { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; text-align: left; }
+.lobby-players li { display: flex; align-items: center; gap: 8px; background: #fff; border-radius: 12px; padding: 6px 10px; }
+.lobby-players em { margin-left: auto; font-style: normal; font-size: .75rem; color: var(--muted); }
+.lobby-players em + em { margin-left: 6px; }
+.timer { justify-self: center; background: var(--navy); color: #fff; border-radius: 99px; padding: 3px 12px; font-size: .9rem; }
+.dbox.wait { width: min(100%, 420px); text-align: center; padding: 10px 14px; gap: 6px; }
+.dbox.wait .sub { margin: 0; color: var(--ink); }
+.setup-box { grid-template-columns: minmax(0, 1fr); }
+.join-row .code-input { min-width: 0; width: 100%; }

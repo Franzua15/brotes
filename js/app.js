@@ -1,4 +1,4 @@
-/* Brotes — interfaz del modo prueba (se juega pasando el móvil). */
+/* Brotes — interfaz del juego: modo online (cada uno en su móvil) y modo prueba (pasando el móvil). */
 (function () {
   "use strict";
   const B = window.Brotes;
@@ -27,10 +27,13 @@
     set(k, v) { try { localStorage.setItem("brotes." + k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento */ } },
   };
 
-  let S = null;
+  let S = null;                       // partida (completa en modo prueba, solo lo que ves en online)
+  let mode = "local";                 // "local" (pasando el móvil) u "online"
   let count = store.get("count", 4);
   const names = store.get("names", []);
   const ui = { showAll: store.get("showAll", false), revealed: null, dialog: null, chosen: null, exSel: [], error: "" };
+  // Datos de la sala online.
+  const net = { code: null, token: null, seat: 0, room: null, version: 0, skew: 0, busy: false, sentTimeout: null, channel: null, live: false, poll: null };
 
   // ---------- utilidades ----------
 
@@ -89,17 +92,23 @@
   }
 
   function saveNames() {
-    document.querySelectorAll(".name-input").forEach((inp, i) => { names[i] = inp.value.trim(); });
+    document.querySelectorAll("#names .name-input").forEach((inp, i) => { names[i] = inp.value.trim(); });
     store.set("names", names);
+  }
+
+  function show(screen) {
+    ["home", "setup", "lobby", "game"].forEach((id) => { $(id).hidden = id !== screen; });
+    closeAll();
   }
 
   function start(sameNames) {
     if (!sameNames) saveNames();
+    mode = "local";
     const list = Array.from({ length: count }, (_, i) => names[i] || "Jugador " + (i + 1));
     S = B.newGame(list);
     Object.assign(ui, { revealed: null, dialog: null, chosen: null, exSel: [], error: "" });
-    $("setup").hidden = true;
-    $("game").hidden = false;
+    $("newGameBtn").textContent = "🔄 Nueva partida";
+    show("game");
     render();
   }
 
@@ -107,6 +116,7 @@
 
   // El jugador cuyas cartas se ven abajo (el que tiene el móvil en este momento).
   function viewer() {
+    if (mode === "online") return net.seat;
     switch (S.phase) {
       case "lose": return S.pending.loss.player;
       case "exchange": return S.pending.actor;
@@ -114,12 +124,13 @@
       default: return S.turn;
     }
   }
-  const canSee = (id) => ui.showAll || ui.revealed === id;
-  const needCurtain = () => !ui.showAll && S.phase !== "over" && ui.revealed !== viewer();
+  const canSee = (id) => (mode === "online" ? id === net.seat : ui.showAll || ui.revealed === id);
+  const needCurtain = () => mode === "local" && !ui.showAll && S.phase !== "over" && ui.revealed !== viewer();
 
   // ---------- jugar ----------
 
   function act(m) {
+    if (mode === "online") return sendMove(m);
     try {
       S = B.dispatch(S, m);
       Object.assign(ui, { error: "", dialog: null, chosen: null, exSel: [] });
@@ -134,9 +145,11 @@
     const me = viewer();
     $("roundInfo").textContent = "Ronda " + S.round;
     const ev = $("event");
-    ev.textContent = S.lastEvent || "";
-    ev.classList.remove("flash"); void ev.offsetWidth; ev.classList.add("flash");
-    $("deckCount").textContent = S.deck.length;
+    if (ev.textContent !== (S.lastEvent || "")) {
+      ev.textContent = S.lastEvent || "";
+      ev.classList.remove("flash"); void ev.offsetWidth; ev.classList.add("flash");
+    }
+    $("deckCount").textContent = S.deckCount != null ? S.deckCount : S.deck.length;
     placeDeck();
     renderSeats(me);
     renderMe(me);
@@ -259,7 +272,22 @@
       const p = S.players[me];
       const hint = p.water >= S.cfg.forceAt ? "⚠️ Tienes " + p.water + " gotas: debes exterminar" : "Tu turno: elige una acción";
       box.prepend(h("div", { class: "turn-hint" }, hint));
+    } else if (S.phase === "action" && mode === "online") {
+      box.prepend(h("div", { class: "turn-hint" }, "Turno de " + S.players[S.turn].name + "…"));
     }
+  }
+
+  // Segundos que quedan para desafiar o bloquear (solo online).
+  function secondsLeft() {
+    if (mode !== "online" || !S || !S._deadline) return null;
+    return Math.max(0, Math.ceil((S._deadline - (Date.now() - net.skew)) / 1000));
+  }
+  const timerEl = () => h("span", { class: "timer", "data-timer": "1" }, "⏱ " + (secondsLeft() ?? "") + "s");
+
+  // Ventana para quien no tiene que decidir nada ahora (online).
+  function waitBox(text) {
+    $("dialog").classList.add("soft");
+    return h("div", { class: "dbox wait" }, h("p", { class: "sub" }, text), mode === "online" && S._deadline ? timerEl() : null);
   }
 
   // ---------- ventanas ----------
@@ -279,12 +307,58 @@
     const pd = S.pending;
     let box = null;
 
+    const online = mode === "online";
+    const waiting = B.waitingFor(S);
+    const iDecide = waiting.includes(me);
+
     if (S.phase === "over") {
       const w = S.players[S.winner];
-      box = dbox("🏆 ¡" + w.name + " gana!", "El último jardín en pie.",
+      if (online) {
+        const host = net.seat === 0;
+        box = dbox("🏆 ¡" + w.name + " gana!", "El último jardín en pie.",
+          host ? h("button", { class: "btn big", onclick: () => netCall("start").then(applyView, showNetError) }, "🌱 Jugar otra vez")
+               : h("p", { class: "sub" }, "Esperando a que " + net.room.players[0] + " empiece otra partida…"),
+          h("button", { class: "btn ghost", onclick: leaveRoom }, "🚪 Salir de la sala"));
+      } else {
+        box = dbox("🏆 ¡" + w.name + " gana!", "El último jardín en pie.",
+          h("div", { class: "row" },
+            h("button", { class: "btn big", onclick: () => start(true) }, "🌱 Jugar otra vez"),
+            h("button", { class: "btn ghost", onclick: backToSetup }, "👥 Cambiar jugadores")));
+      }
+    } else if (online && (S.phase === "challenge" || S.phase === "block") && !iDecide) {
+      const c = pd.claim;
+      const actor = S.players[pd.actor].name;
+      let txt;
+      if (S.phase === "challenge") {
+        const who = c.claimant === me ? "Tú" : S.players[c.claimant].name;
+        txt = c.kind === "block" ? "🛡️ " + who + " bloquea con " + roleName(c.role) + ". ¿Alguien lo desafía?"
+          : "⭐ " + who + (c.claimant === me ? " usas " : " usa ") + roleName(c.role) + ". Esperando a ver si alguien desafía…";
+      } else {
+        txt = "🛡️ " + (pd.actor === me ? "Tu acción" : "La acción de " + actor) + " se puede bloquear. Esperando…";
+      }
+      box = waitBox(txt);
+    } else if (online && S.phase === "lose" && pd.loss.player !== me) {
+      box = waitBox("💀 " + S.players[pd.loss.player].name + " está eligiendo qué planta pierde…");
+    } else if (online && S.phase === "exchange" && pd.actor !== me) {
+      box = waitBox("🌻 " + S.players[pd.actor].name + " está cambiando cartas con el mazo…");
+    } else if (online && S.phase === "challenge") {
+      const c = pd.claim;
+      const who = S.players[c.claimant].name;
+      const txt = c.kind === "block"
+        ? who + " bloquea con " + roleName(c.role)
+        : who + " usa " + roleName(c.role) + ": " + B.ACTIONS[pd.action].name.toLowerCase() + (pd.target != null ? " → " + (pd.target === me ? "tú" : S.players[pd.target].name) : "");
+      box = dbox("🤔 ¿Lo desafías?", txt,
+        h("button", { class: "claim-card", type: "button", onclick: () => zoom(IMG[c.role]) }, h("img", { src: IMG[c.role], alt: roleName(c.role) })),
         h("div", { class: "row" },
-          h("button", { class: "btn big", onclick: () => start(true) }, "🌱 Jugar otra vez"),
-          h("button", { class: "btn ghost", onclick: backToSetup }, "👥 Cambiar jugadores")));
+          h("button", { class: "btn warn big", onclick: () => act({ type: "challenge", player: me }) }, "❗ Desafiar"),
+          h("button", { class: "btn ok big", onclick: () => act({ type: "pass", player: me }) }, "✓ Dejar pasar")),
+        timerEl());
+    } else if (online && S.phase === "block") {
+      const a = B.ACTIONS[pd.action];
+      const grid = h("div", { class: "grid" });
+      a.blockedBy.forEach((r) => grid.append(h("button", { class: "btn role-" + r, onclick: () => act({ type: "block", player: me, role: r }) }, "🛡️ Bloquear", h("small", null, "con " + roleName(r)))));
+      box = dbox("🛡️ ¿Lo bloqueas?", S.players[pd.actor].name + ": " + a.name.toLowerCase() + (pd.target != null ? " → " + (pd.target === me ? "tú" : S.players[pd.target].name) : ""),
+        grid, h("button", { class: "btn big ok", onclick: () => act({ type: "pass", player: me }) }, "✓ No bloquear"), timerEl());
     } else if (S.phase === "action" && ui.dialog === "skills") {
       box = skillsBox(me);
     } else if (S.phase === "action" && ui.dialog === "target") {
@@ -398,11 +472,196 @@
 
   function backToSetup() {
     S = null;
-    closeAll();
-    $("game").hidden = true;
-    $("setup").hidden = false;
+    show("setup");
     renderSetup();
   }
+
+  // ---------- modo online ----------
+
+  const CFG = window.BROTES_CONFIG || {};
+  const FN_URL = CFG.url + "/functions/v1/brotes";
+
+  async function netCall(op, extra) {
+    const res = await fetch(FN_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: CFG.key },
+      body: JSON.stringify(Object.assign({ op, code: net.code, token: net.token }, extra || {})),
+    });
+    let body = {};
+    try { body = await res.json(); } catch (e) { /* sin cuerpo */ }
+    if (!res.ok) throw new Error(body.error || "No hay conexión con el servidor.");
+    return body;
+  }
+
+  function showNetError(e) {
+    const msg = e && e.message ? e.message : "No hay conexión con el servidor.";
+    if (!$("game").hidden) { ui.error = msg; render(); }
+    else if (!$("lobby").hidden) { $("lobbyError").textContent = "⚠️ " + msg; $("lobbyError").hidden = false; }
+    else { $("homeError").textContent = "⚠️ " + msg; $("homeError").hidden = false; }
+  }
+
+  // Aplica lo que devuelve el servidor y muestra la pantalla que toque.
+  function applyView(v) {
+    if (!v || !v.room) return;
+    // Sin cambios desde la última vez: no se redibuja (así no se pierde un toque a medias).
+    if (v.room.version === net.version && v.room.code === net.code && v.seat === net.seat && (S || !$("lobby").hidden)) return;
+    if (v.token) net.token = v.token;
+    net.code = v.room.code;
+    net.seat = v.seat;
+    net.room = v.room;
+    net.version = v.room.version;
+    store.set("session", { code: net.code, token: net.token });
+    if (v.room.status === "lobby" || !v.state) {
+      S = null;
+      renderLobby();
+      if ($("lobby").hidden) show("lobby");
+      return;
+    }
+    const fresh = !S || S.log.length !== v.state.log.length || S.phase !== v.state.phase;
+    S = v.state;
+    net.skew = Date.now() - v.state.now;
+    if (fresh) Object.assign(ui, { error: "", dialog: S.phase === "action" ? ui.dialog : null, chosen: S.phase === "action" ? ui.chosen : null, exSel: S.phase === "exchange" ? ui.exSel : [] });
+    if (S.phase !== "action" || S.turn !== net.seat) { ui.dialog = null; ui.chosen = null; }
+    mode = "online";
+    $("newGameBtn").textContent = "🚪 Salir de la sala";
+    if ($("game").hidden) show("game");
+    render();
+  }
+
+  async function refresh() {
+    if (!net.code || !net.token || net.busy) return;
+    try { applyView(await netCall("view")); }
+    catch (e) {
+      if (/No existe|No formas parte/.test(e.message)) { forgetSession(); show("home"); showNetError(e); }
+    }
+  }
+
+  async function sendMove(m) {
+    if (net.busy) return;
+    net.busy = true;
+    try {
+      applyView(await netCall("move", { move: m }));
+    } catch (e) {
+      ui.error = e.message;
+      render();
+    } finally {
+      net.busy = false;
+    }
+  }
+
+  // Tiempo real: el servidor avisa por este canal cada vez que cambia algo.
+  function connectLive() {
+    disconnectLive();
+    try {
+      if (!window.supabase || !CFG.url) throw new Error("sin librería");
+      const client = net.client || (net.client = window.supabase.createClient(CFG.url, CFG.key, { auth: { persistSession: false } }));
+      net.channel = client.channel("brotes-" + net.code)
+        .on("broadcast", { event: "update" }, (msg) => { if (!msg.payload || msg.payload.v > net.version) refresh(); })
+        .subscribe((status) => { net.live = status === "SUBSCRIBED"; if (net.live) refresh(); });
+    } catch (e) { net.live = false; }
+    // Respaldo por si el tiempo real se corta: consulta cada pocos segundos.
+    net.poll = setInterval(() => { if (!document.hidden) refresh(); }, 4000);
+  }
+  function disconnectLive() {
+    if (net.poll) clearInterval(net.poll);
+    net.poll = null;
+    if (net.channel && net.client) net.client.removeChannel(net.channel);
+    net.channel = null;
+    net.live = false;
+  }
+
+  function forgetSession() {
+    disconnectLive();
+    store.set("session", null);
+    Object.assign(net, { code: null, token: null, room: null, version: 0 });
+    S = null;
+    mode = "local";
+  }
+
+  async function leaveRoom() {
+    if (net.room && net.room.status === "lobby" && net.seat !== 0) { try { await netCall("leave"); } catch (e) { /* ya no estaba */ } }
+    forgetSession();
+    show("home");
+  }
+
+  function myName() {
+    const n = $("myName").value.trim();
+    if (!n) { $("myName").focus(); throw new Error("Escribe tu nombre."); }
+    store.set("myName", n);
+    return n;
+  }
+
+  async function createRoom() {
+    $("homeError").hidden = true;
+    try {
+      const name = myName();
+      net.code = null; net.token = null;
+      $("createBtn").disabled = true;
+      applyView(await netCall("create", { name }));
+      connectLive();
+    } catch (e) { showNetError(e); }
+    finally { $("createBtn").disabled = false; }
+  }
+
+  async function joinRoom() {
+    $("homeError").hidden = true;
+    try {
+      const name = myName();
+      const code = $("joinCode").value.trim().toUpperCase();
+      if (code.length < 4) { $("joinCode").focus(); throw new Error("Escribe el código de la sala."); }
+      const saved = store.get("session", null);
+      net.code = code;
+      net.token = saved && saved.code === code ? saved.token : null;
+      $("joinBtn").disabled = true;
+      applyView(await netCall("join", { name }));
+      connectLive();
+    } catch (e) { net.code = null; showNetError(e); }
+    finally { $("joinBtn").disabled = false; }
+  }
+
+  function renderLobby() {
+    const r = net.room;
+    $("lobbyCode").textContent = r.code;
+    $("lobbyCount").textContent = "Jugadores (" + r.players.length + "/10)";
+    const ul = $("lobbyPlayers");
+    ul.innerHTML = "";
+    r.players.forEach((n, i) => ul.append(h("li", null, avatar({ id: i, name: n }, "small"), n,
+      i === 0 ? h("em", null, "👑 crea la sala") : null, i === net.seat ? h("em", null, "tú") : null)));
+    const host = net.seat === 0;
+    $("lobbyStart").hidden = !host;
+    $("lobbyStart").disabled = r.players.length < 2;
+    $("lobbyStart").textContent = r.players.length < 2 ? "Esperando jugadores…" : "🌱 Empezar partida";
+    $("lobbyWait").textContent = host ? "Comparte el código. Cuando estén todos, pulsa empezar." : "Esperando a que " + r.players[0] + " empiece la partida…";
+    $("lobbyLeave").textContent = host ? "Cerrar y volver al inicio" : "Salir de la sala";
+  }
+
+  async function shareRoom() {
+    const url = location.origin + location.pathname + "?sala=" + net.code;
+    const text = "¡Juega a Brotes conmigo! Código de sala: " + net.code;
+    try {
+      if (navigator.share) { await navigator.share({ title: "Brotes", text, url }); return; }
+    } catch (e) { return; }
+    try {
+      await navigator.clipboard.writeText(text + " " + url);
+      $("shareBtn").textContent = "✅ Enlace copiado";
+      setTimeout(() => { $("shareBtn").textContent = "📤 Invitar amigos"; }, 2000);
+    } catch (e) {
+      prompt("Copia este enlace:", url);
+    }
+  }
+
+  // Cuenta atrás de desafíos y bloqueos; al terminar se avisa al servidor.
+  setInterval(() => {
+    if (mode !== "online" || !S) return;
+    const left = secondsLeft();
+    document.querySelectorAll("[data-timer]").forEach((el) => { el.textContent = "⏱ " + left + "s"; });
+    if (left === 0 && S._deadline && net.sentTimeout !== S._deadline && !net.busy) {
+      net.sentTimeout = S._deadline;
+      netCall("move", { move: { type: "timeout" } }).then(applyView).catch(() => {});
+    }
+  }, 250);
+
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && mode === "online") refresh(); });
 
   // ---------- guía, carta en grande y menú ----------
 
@@ -474,10 +733,34 @@
   // ---------- arranque ----------
 
   $("startBtn").onclick = () => start(false);
-  $("menuBtn").onclick = () => { renderLog(); open("menu"); };
-  $("newGameBtn").onclick = backToSetup;
+  $("localBtn").onclick = () => { show("setup"); renderSetup(); };
+  $("backHome").onclick = () => show("home");
+  $("createBtn").onclick = createRoom;
+  $("joinBtn").onclick = joinRoom;
+  $("joinCode").addEventListener("keydown", (e) => { if (e.key === "Enter") joinRoom(); });
+  $("joinCode").addEventListener("input", (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""); });
+  $("shareBtn").onclick = shareRoom;
+  $("lobbyStart").onclick = () => { $("lobbyError").hidden = true; netCall("start").then(applyView, showNetError); };
+  $("lobbyLeave").onclick = leaveRoom;
+  $("menuBtn").onclick = () => {
+    renderLog();
+    $("showAll").closest("label").hidden = mode === "online";
+    open("menu");
+  };
+  $("newGameBtn").onclick = () => { if (mode === "online") leaveRoom(); else backToSetup(); };
   $("showAll").checked = ui.showAll;
   $("showAll").onchange = (e) => { ui.showAll = e.target.checked; store.set("showAll", ui.showAll); render(); };
   buildGuide();
   renderSetup();
+
+  // Inicio: nombre guardado, código del enlace de invitación y volver a la sala si se recargó la página.
+  $("myName").value = store.get("myName", "");
+  const linkCode = new URLSearchParams(location.search).get("sala");
+  if (linkCode) $("joinCode").value = linkCode.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
+  const session = store.get("session", null);
+  if (session && session.code && session.token && (!linkCode || linkCode.toUpperCase() === session.code)) {
+    net.code = session.code;
+    net.token = session.token;
+    netCall("view").then((v) => { applyView(v); connectLive(); }).catch(() => { forgetSession(); });
+  }
 })();

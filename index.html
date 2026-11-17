@@ -12,15 +12,51 @@
 <body>
 
 <!-- Pantalla de inicio -->
-<section id="setup" class="screen">
+<section id="home" class="screen">
   <img class="logo-big" src="assets/logo.webp" alt="Brotes">
   <div class="setup-box">
-    <p class="mode">🧪 Modo prueba: se juega pasando el móvil</p>
+    <h2>🌐 Jugar online</h2>
+    <input id="myName" class="name-input wide" maxlength="14" placeholder="Tu nombre" aria-label="Tu nombre" autocomplete="nickname">
+    <button id="createBtn" class="btn big">🌱 Crear sala</button>
+    <div class="or"><span>o únete con un código</span></div>
+    <div class="join-row">
+      <input id="joinCode" class="name-input code-input" maxlength="5" placeholder="CÓDIGO" aria-label="Código de la sala" autocomplete="off" autocapitalize="characters">
+      <button id="joinBtn" class="btn">Unirme</button>
+    </div>
+    <p id="homeError" class="error" hidden></p>
+    <div class="row">
+      <button class="btn ghost" data-open-guide>📖 Guía</button>
+      <button class="btn ghost" id="localBtn">📱 Modo prueba</button>
+    </div>
+  </div>
+</section>
+
+<!-- Modo prueba (un solo móvil) -->
+<section id="setup" class="screen" hidden>
+  <img class="logo-big" src="assets/logo.webp" alt="Brotes">
+  <div class="setup-box">
+    <p class="mode">📱 Modo prueba: se juega pasando el móvil</p>
     <h2>¿Cuántos jugadores?</h2>
     <div id="countChips" class="chips"></div>
     <div id="names" class="names"></div>
     <button id="startBtn" class="btn big">🌱 Empezar partida</button>
-    <button class="btn ghost" data-open-guide>📖 Ver la guía</button>
+    <button class="btn ghost" id="backHome">← Volver</button>
+  </div>
+</section>
+
+<!-- Sala de espera (online) -->
+<section id="lobby" class="screen" hidden>
+  <img class="logo-mid" src="assets/logo.webp" alt="Brotes">
+  <div class="setup-box">
+    <p class="mode">Código de la sala</p>
+    <div id="lobbyCode" class="big-code"></div>
+    <button id="shareBtn" class="btn ghost">📤 Invitar amigos</button>
+    <h2 id="lobbyCount"></h2>
+    <ul id="lobbyPlayers" class="lobby-players"></ul>
+    <button id="lobbyStart" class="btn big">🌱 Empezar partida</button>
+    <p id="lobbyWait" class="mode"></p>
+    <p id="lobbyError" class="error" hidden></p>
+    <button id="lobbyLeave" class="btn ghost small">Salir de la sala</button>
   </div>
 </section>
 
@@ -79,6 +115,8 @@
   </div>
 </div>
 
+<script src="js/config.js"></script>
+<script src="js/vendor/supabase-2.57.4.js"></script>
 <script src="js/engine.js"></script>
 <script src="js/app.js"></script>
 </body>

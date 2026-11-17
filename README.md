@@ -4,17 +4,36 @@ Juego de cartas de faroles para 2 a 10 jugadores. Cada jugador cuida un jardín 
 
 ## Estado actual
 
-**Prototipo en modo prueba**: se juega pasando el móvil. Antes de cada turno aparece "Pásale el móvil a…" para que nadie vea las cartas de otro. Sirve para comprobar que las reglas funcionan antes de conectar varios móviles.
+**🌐 Modo online** (cada uno en su móvil):
+1. Uno pulsa **Crear sala** y comparte el código (o el enlace de **Invitar amigos**).
+2. Los demás escriben el código y pulsan **Unirme**. Hasta 10 jugadores.
+3. Quien creó la sala pulsa **Empezar partida**.
 
-- Motor de reglas completo: acciones, desafíos, bloqueos, Enredadera, Abono y Exterminar obligatorio.
+Cada jugador ve solo sus cartas: la partida la guarda el servidor, no los móviles. Para desafiar o bloquear hay 15 segundos; si nadie responde, el juego sigue solo. Si se recarga la página, vuelves a tu partida.
+
+**📱 Modo prueba**: se juega pasando el móvil, con una pantalla "Pásale el móvil a…" entre turnos.
+
+- Mesa con los jugadores alrededor, el mazo al centro, tus cartas abajo, tu contador de gotas y 4 botones: 💧 refrescarse, 💧💧 ayuda, 🎯 exterminar y ⭐ habilidad (las que no tienes se usan con **astucia**).
 - Botón **📖 Guía** con las cartas para pasar deslizando, y reglas rápidas.
-- Mesa con los jugadores alrededor, el mazo y el manantial al centro, tus cartas abajo, tu contador de gotas y 4 botones: 💧 refrescarse, 💧💧 ayuda, 🎯 exterminar y ⭐ habilidad (las que no tienes se usan con **astucia**).
 
-Pendiente: modo online (cada uno en su móvil, salas con código) y APK de Android.
+Pendiente: APK de Android.
+
+## Servidor online (Supabase)
+
+- `supabase/schema.sql`: tabla `rooms`. Solo el servidor puede leerla (RLS sin políticas).
+- `supabase/functions/brotes/index.ts`: servidor del juego (Edge Function). Usa el mismo motor `js/engine.js`.
+- `supabase/deploy.sh`: sube el servidor. Necesita `SUPABASE_ACCESS_TOKEN`.
+- `js/config.js`: dirección del proyecto y clave pública (publishable).
 
 ## Cómo probarlo
 
 Abre `index.html` en el navegador. No hace falta instalar nada.
+
+Prueba del servidor real (necesita red):
+
+```bash
+node test/server.test.js
+```
 
 ## Pruebas del motor
 
