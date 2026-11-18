@@ -65,7 +65,8 @@
   <div class="hud-top">
     <span id="roundInfo" class="pill"></span>
     <div id="event" class="event" role="status" aria-live="polite"></div>
-    <button class="round-btn" data-open-guide aria-label="Guía de personajes">📖</button>
+    <button class="round-btn" id="charsBtn" aria-label="Habilidades de los personajes">📋</button>
+    <button class="round-btn" data-open-guide aria-label="Guía del juego">📖</button>
     <button class="round-btn" id="menuBtn" aria-label="Opciones">⚙️</button>
   </div>
 
@@ -75,11 +76,21 @@
 
   <div id="seats"></div>
 
-  <div id="me" class="me"></div>
-
-  <div id="water" class="water-badge" aria-label="Tus gotas"></div>
-
-  <div id="actions" class="actions"></div>
+  <!-- Zona de abajo: carta de acciones a un lado y tu mano -->
+  <div id="bottom" class="bottom">
+    <div class="side">
+      <div id="actionCard" class="action-card">
+        <img src="assets/guia/acciones.webp" alt="Acciones por turno">
+        <button type="button" class="ac-row r1" data-act="refrescar" aria-label="Refrescarse: gana 1 gota"></button>
+        <button type="button" class="ac-row r2" data-act="ayuda" aria-label="Pedir ayuda a la naturaleza: toma 2 gotas"></button>
+        <button type="button" class="ac-row r3" data-act="exterminar" aria-label="Exterminar: paga 8 gotas"></button>
+        <button type="button" class="ac-row r4" data-act="habilidad" aria-label="Usar la habilidad de una planta"></button>
+      </div>
+    </div>
+    <div class="mine">
+      <div id="me" class="me"></div>
+    </div>
+  </div>
 
   <div id="dialog" class="dialog" hidden></div>
   <div id="curtain" class="curtain" hidden></div>

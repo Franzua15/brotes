@@ -94,6 +94,52 @@ test("Enredadera bloquea al Cactus; un bloqueo falso se castiga y el Cactus sigu
   assert.strictEqual(s.players[1].status, "abono");
 });
 
+test("Defensa inmediata: el atacado bloquea al Cactus con Enredadera sin esperar a los desafíos", () => {
+  let s = setup(4, [["cactus", "girasol"], ["enredadera", "tronco"], ["girasol", "girasol"], ["tronco", "tronco"]]);
+  s.players[0].water = 5;
+  s = go(s, { type: "action", player: 0, action: "cactus", target: 1 });
+  assert.strictEqual(s.phase, "challenge");
+  assert.deepStrictEqual(B.blockOptions(s, 1), ["enredadera"], "el atacado puede bloquear ya");
+  assert.deepStrictEqual(B.blockOptions(s, 2), [], "los demás no bloquean al Cactus");
+  assert.throws(() => go(s, { type: "block", player: 2, role: "enredadera" }));
+  s = go(s, { type: "block", player: 1, role: "enredadera" });
+  assert.strictEqual(s.phase, "challenge");
+  assert.strictEqual(s.pending.claim.kind, "block");
+  s = go(s, { type: "passAll" });
+  assert.strictEqual(B.liveCards(s.players[1]).length, 2, "el bloqueo lo salvó");
+  assert.strictEqual(s.players[0].water, 2, "el Cactus pagó igual");
+  assert.strictEqual(s.turn, 1);
+});
+
+test("Defensa inmediata también tras decir 'no desafío', y con Tronco/Girasol y contra la Enredadera", () => {
+  let s = setup(3, [["tronco", "enredadera"], ["girasol", "cactus"], ["tronco", "carnivora"]]);
+  s.players[1].water = 4;
+  s = go(s, { type: "action", player: 0, action: "tronco", target: 1 });
+  s = go(s, { type: "pass", player: 1 });               // el atacado no desafía…
+  assert.deepStrictEqual(B.blockOptions(s, 1), ["tronco", "girasol"], "…pero aún puede bloquear");
+  s = go(s, { type: "block", player: 1, role: "girasol" });
+  s = go(s, { type: "passAll" });
+  assert.strictEqual(s.players[1].water, 4, "no le robaron");
+
+  let t = setup(3, [["enredadera", "girasol"], ["tronco", "cactus"], ["girasol", "girasol"]]);
+  t = go(t, { type: "action", player: 0, action: "enredadera", target: 1 });
+  assert.deepStrictEqual(B.blockOptions(t, 1), ["tronco"]);
+  t = go(t, { type: "block", player: 1, role: "tronco" });
+  t = go(t, { type: "passAll" });
+  assert.strictEqual(t.vines[0], undefined, "no se enganchó");
+});
+
+test("Pedir ayuda: cualquiera puede bloquearla con Carnívora", () => {
+  let s = setup(3, [["cactus", "girasol"], ["tronco", "tronco"], ["carnivora", "girasol"]]);
+  s = go(s, { type: "action", player: 0, action: "ayuda" });
+  assert.strictEqual(s.phase, "block");
+  assert.deepStrictEqual(B.blockOptions(s, 2), ["carnivora"]);
+  assert.deepStrictEqual(B.blockOptions(s, 0), [], "no te bloqueas a ti mismo");
+  s = go(s, { type: "block", player: 2, role: "carnivora" });
+  s = go(s, { type: "passAll" });
+  assert.strictEqual(s.players[0].water, 2);
+});
+
 test("Tronco roba 2 gotas; Girasol y Tronco lo bloquean", () => {
   let s = setup(3, [["tronco", "girasol"], ["cactus", "cactus"], ["girasol", "girasol"]]);
   s.players[1].water = 5;
@@ -233,6 +279,12 @@ function randomMove(s, r) {
       return m;
     }
     case "challenge": {
+      // A veces el atacado se defiende bloqueando sin esperar.
+      const defenders = s.players.filter((p) => B.blockOptions(s, p.id).length);
+      if (defenders.length && r() < 0.2) {
+        const d = pick(defenders);
+        return { type: "block", player: d.id, role: pick(B.blockOptions(s, d.id)) };
+      }
       const id = pick(w);
       return r() < 0.25 ? { type: "challenge", player: id } : { type: "pass", player: id };
     }

@@ -406,11 +406,28 @@
     return requireLoss(s, claimant.id, "lo descubrieron", "resolve");
   }
 
-  function doBlock(s, m) {
-    if (s.phase !== "block") fail("Ahora no se puede bloquear.");
-    if (!s.pending.blockers.includes(m.player)) fail("Este jugador no puede bloquear.");
+  // Plantas con las que un jugador puede bloquear ahora mismo.
+  // El atacado puede defenderse en cuanto lo atacan, sin esperar a que los demás decidan si desafían.
+  function blockOptions(s, pid) {
+    if (!s.pending || !s.pending.action) return [];
     const a = ACTIONS[s.pending.action];
-    if (!a.blockedBy.includes(m.role)) fail("Esa planta no bloquea esta acción.");
+    const p = s.players[pid];
+    if (!a.blockedBy || !p || !isAlive(p)) return [];
+    if (s.phase === "block") return s.pending.blockers.includes(pid) && !s.pending.passed.includes(pid) ? a.blockedBy.slice() : [];
+    if (s.phase === "challenge" && s.pending.claim && s.pending.claim.kind === "action") {
+      const eligible = a.anyoneBlocks ? pid !== s.pending.actor : pid === s.pending.target;
+      return eligible ? a.blockedBy.slice() : [];
+    }
+    return [];
+  }
+
+  function doBlock(s, m) {
+    if (s.phase !== "block" && s.phase !== "challenge") fail("Ahora no se puede bloquear.");
+    const roles = blockOptions(s, m.player);
+    if (!roles.length) fail("Este jugador no puede bloquear.");
+    if (!roles.includes(m.role)) fail("Esa planta no bloquea esta acción.");
+    // Bloquear acepta la acción tal cual: se cierra la ventana de desafíos a la acción.
+    if (s.phase === "challenge") s.pending.blockers = [m.player];
     log(s, "🛡️ " + nameOf(s, m.player) + " bloquea diciendo tener " + roleLabel(m.role) + ".");
     s.pending.block = { player: m.player, role: m.role };
     startClaim(s, m.player, m.role, "block");
@@ -503,7 +520,7 @@
     return v;
   }
 
-  const api = { ROLES, ROLE_INFO, ACTIONS, DEFAULT_CONFIG, newGame, dispatch, availableActions, waitingFor, viewFor, liveCards, isAlive };
+  const api = { ROLES, ROLE_INFO, ACTIONS, DEFAULT_CONFIG, newGame, dispatch, availableActions, waitingFor, blockOptions, viewFor, liveCards, isAlive };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.Brotes = api;
 })(typeof window !== "undefined" ? window : globalThis);

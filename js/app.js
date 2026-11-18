@@ -167,8 +167,9 @@
     // En pantallas muy bajas tus cartas lo taparían: se mueve a la izquierda, aún dentro del círculo.
     if (H < 520 && W > H) {
       const c = document.querySelector(".center");
-      c.style.left = (x - BG.w * scale * 0.11) + "px";
-      c.style.top = y + "px";
+      // En horizontal bajo el mazo va a la derecha de la mesa, libre de jugadores y de tu mano.
+      c.style.left = (W - 64) + "px";
+      c.style.top = (H * 0.5) + "px";
       return;
     }
     const c = document.querySelector(".center");
@@ -195,14 +196,16 @@
     const avatarHalf = innerWidth >= 900 && innerHeight >= 600 ? 40 : 28;
     // En vertical el arco baja también por los costados para que quepan hasta 10 jugadores.
     const portrait = innerHeight > innerWidth;
-    const spread = portrait ? 0.55 : 0;
+    const short = !portrait && innerHeight < 520;
+    // En horizontal bajo, los costados suben un poco para no chocar con la carta de acciones.
+    const spread = portrait ? 0.55 : short ? -0.3 : 0;
     const cy = portrait ? 38 : innerHeight < 520 ? 60 : 50;
     const ry = Math.max(10, cy - ((barBottom + avatarHalf + 8) / H) * 100);
     for (let k = 1; k < n; k++) {
       const p = S.players[(me + k) % n];
       // Repartidos en arco alrededor de la mesa, de izquierda a derecha por arriba.
       const a = Math.PI - spread + (k * (Math.PI + 2 * spread)) / n;
-      const x = 50 + Math.cos(a) * 41;
+      const x = 50 + Math.cos(a) * (short ? 37 : 41);
       const y = cy + Math.sin(a) * ry;
       const pickable = picking && p.status === "alive";
       const seat = h(pickable ? "button" : "div", {
@@ -228,29 +231,31 @@
 
   // Orden de las plantas en tu mano (como la guía).
   const HAND_ORDER = ["tronco", "girasol", "enredadera", "cactus", "carnivora"];
+  const myTurnNow = () => !!S && S.phase === "action" && S.turn === viewer() && !needCurtain();
+  const ownCount = (p, role) => p.cards.filter((c) => !c.lost && c.role === role).length;
 
   function renderMe(me) {
     const p = S.players[me];
     const box = $("me");
     box.innerHTML = "";
     const see = canSee(me);
-    const myTurn = S.phase === "action" && S.turn === me && !needCurtain();
+    const myTurn = myTurnNow();
     const acts = myTurn ? B.availableActions(S, me) : [];
     let hand;
     if (p.status === "abono") {
       hand = h("div", { class: "hand" }, h("button", { type: "button", class: "card big face", onclick: () => zoom(IMG.abono) }, h("img", { src: IMG.abono, alt: "Abono" })));
     } else if (p.status === "alive" && see) {
       // Las 5 plantas: a color las que tienes, en blanco y negro las que puedes usar con astucia.
+      // Al tocar una se abre en grande, con el botón para usarla.
       hand = h("div", { class: "hand5" + (myTurn ? " my-turn" : "") });
       for (const role of HAND_ORDER) {
-        const n = p.cards.filter((c) => !c.lost && c.role === role).length;
-        const usable = acts.filter((a) => a.role === role && a.ok);
-        const blocked = myTurn && !usable.length;
+        const n = ownCount(p, role);
+        const usable = acts.some((a) => a.role === role && a.ok);
         hand.append(h("button", {
           type: "button",
-          class: "pcard " + (n ? "own" : "astucia") + (myTurn && usable.length ? " ready" : "") + (blocked ? " blocked" : ""),
+          class: "pcard " + (n ? "own" : "astucia") + (myTurn && usable ? " ready" : "") + (myTurn && !usable ? " blocked" : ""),
           "aria-label": roleName(role) + (n ? " (la tienes)" : " (astucia)"),
-          onclick: () => (myTurn && usable.length ? useRole(role) : zoom(IMG[role])),
+          onclick: () => { ui.dialog = "card"; ui.role = role; ui.error = ""; render(); },
         },
           h("img", { src: IMG[role], alt: "" }),
           h("span", { class: "pc-tag" }, n ? (n > 1 ? "✓ x" + n : "✓ Tuya") : "🦊 Astucia")));
@@ -261,41 +266,58 @@
     }
     const lost = p.status === "alive" ? p.cards.filter((c) => c.lost) : [];
     box.append(hand);
-    const tag = h("div", { class: "me-tag" + (S.turn === me && S.phase !== "over" ? " turn" : "") }, avatar(p, "small"), p.name);
+    const myTurnTag = S.phase === "action" && S.turn === me;
+    const tag = h("div", { class: "me-tag" + (myTurnTag ? " turn" : "") }, avatar(p, "small"), h("span", { class: "me-name" }, p.name));
+    // Tus gotas, junto a tu nombre.
+    if (p.status === "abono") tag.append(h("span", { class: "me-water abono" }, "🍂 " + p.abonoGotas));
+    else if (p.status === "alive") tag.append(h("span", { class: "me-water" }, h("img", { src: ICON.gota, alt: "" }), String(p.water)));
+    if (myTurnTag && p.status === "alive") tag.append(h("span", { class: "me-turn" + (p.water >= S.cfg.forceAt ? " must" : "") }, p.water >= S.cfg.forceAt ? "⚠️ Debes exterminar" : "✨ Tu turno"));
     if (lost.length) lost.forEach((c) => tag.append(cardEl(c, { size: "tiny" })));
     if (S.vines[me] != null) tag.append(h("span", { class: "stag" }, "🌿 → " + S.players[S.vines[me]].name));
     const caught = vineInfo()[me];
     if (caught) tag.append(h("span", { class: "stag" }, "🪢 de " + caught.join(", ")));
     box.append(tag);
-
-    const w = $("water");
-    w.innerHTML = "";
-    if (p.status === "abono") w.append(h("span", { class: "big-num" }, "🍂 " + p.abonoGotas));
-    else w.append(h("img", { src: ICON.gota, alt: "" }), h("span", { class: "big-num" }, String(p.water)));
   }
 
+  // La carta de "Acciones por turno": siempre a la vista, y en tu turno se tocan sus filas.
   function renderActions(me) {
-    const box = $("actions");
-    box.innerHTML = "";
-    const myTurn = S.phase === "action" && S.turn === me && !needCurtain();
+    const myTurn = myTurnNow();
     const acts = myTurn ? B.availableActions(S, me) : [];
-    const get = (k) => acts.find((a) => a.key === k);
-    const btn = (icon, label, ok, why, fn) => h("button", {
-      type: "button", class: "abtn" + (ok ? "" : " off"), disabled: !ok, title: why || label, onclick: fn,
-    }, h("img", { src: ICON[icon], alt: "" }), h("span", null, label));
-    const r = get("refrescar"), a = get("ayuda"), x = get("exterminar");
-    box.append(
-      btn("gota", "Refrescarse", r && r.ok, r && r.reason, () => act({ type: "action", player: me, action: "refrescar" })),
-      btn("gotas2", "Ayuda", a && a.ok, a && a.reason, () => act({ type: "action", player: me, action: "ayuda" })),
-      btn("diana", "Exterminar", x && x.ok, x && x.reason, () => { ui.dialog = "target"; ui.chosen = "exterminar"; render(); }),
-    );
-    if (myTurn) {
-      const p = S.players[me];
-      const hint = p.water >= S.cfg.forceAt ? "⚠️ Tienes " + p.water + " gotas: debes exterminar" : "Tu turno: elige una acción o toca una planta";
-      box.prepend(h("div", { class: "turn-hint" }, hint));
-    } else if (S.phase === "action" && mode === "online") {
-      box.prepend(h("div", { class: "turn-hint" }, "Turno de " + S.players[S.turn].name + "…"));
+    const card = $("actionCard");
+    card.classList.toggle("active", myTurn);
+    card.querySelectorAll(".ac-row").forEach((row) => {
+      const k = row.dataset.act;
+      const a = acts.find((x) => x.key === k);
+      const ok = k === "habilidad" ? acts.some((x) => x.role && x.ok) : !!(a && a.ok);
+      row.classList.toggle("ok", myTurn && ok);
+      row.classList.toggle("off", myTurn && !ok);
+    });
+  }
+
+  // Aviso corto en la barra de arriba.
+  function flashHint(msg) {
+    const ev = $("event");
+    ev.textContent = msg;
+    ev.classList.remove("flash", "warn"); void ev.offsetWidth; ev.classList.add("warn");
+  }
+
+  function onActionCard(e) {
+    if (!S) return;
+    const row = e.target.closest(".ac-row");
+    if (!row || !myTurnNow()) { zoom("assets/guia/acciones.webp"); return; }
+    const me = viewer();
+    const k = row.dataset.act;
+    const acts = B.availableActions(S, me);
+    if (k === "habilidad") {
+      const hand = document.querySelector(".hand5");
+      if (hand) { hand.classList.remove("flash"); void hand.offsetWidth; hand.classList.add("flash"); }
+      flashHint("👇 Toca una de tus plantas para abrirla y usar su habilidad");
+      return;
     }
+    const a = acts.find((x) => x.key === k);
+    if (!a || !a.ok) { flashHint("⚠️ " + (a ? a.reason : "Ahora no puedes")); return; }
+    if (k === "exterminar") { ui.dialog = "target"; ui.chosen = k; render(); return; }
+    act({ type: "action", player: me, action: k });
   }
 
   // Ventana para quien no tiene que decidir nada ahora (online).
@@ -314,6 +336,28 @@
       h("h3", null, title), sub ? h("p", { class: "sub" }, sub) : null, ...body);
   }
 
+  const targetName = (pd, me) => (pd.target != null ? " → " + (pd.target === me ? "tú" : S.players[pd.target].name) : "");
+  const claimText = (pd, me) => {
+    const c = pd.claim;
+    const who = c.claimant === me ? "Tú" : S.players[c.claimant].name;
+    return c.kind === "block"
+      ? who + " bloquea con " + roleName(c.role)
+      : who + " usa " + roleName(c.role) + ": " + B.ACTIONS[pd.action].name.toLowerCase() + targetName(pd, me);
+  };
+  const claimCard = (role) => h("button", { class: "claim-card", type: "button", onclick: () => zoom(IMG[role]) }, h("img", { src: IMG[role], alt: roleName(role) }));
+
+  // Botones para defenderse bloqueando, cada uno con su carta.
+  function defendButtons(pid, roles, showOwn, withName) {
+    const p = S.players[pid];
+    return h("div", { class: "defend" }, roles.map((r) => {
+      const n = ownCount(p, r);
+      const note = showOwn ? (n ? "✓ La tienes" : "🦊 Con astucia: no la tienes") : "";
+      return h("button", { type: "button", class: "defend-card role-" + r + (showOwn ? (n ? " own" : " astucia") : ""), onclick: () => act({ type: "block", player: pid, role: r }) },
+        h("img", { src: IMG[r], alt: "" }),
+        h("span", { class: "dc-text" }, h("b", null, "🛡️ " + (withName ? p.name + " bloquea" : "Bloquear") + " con " + roleName(r)), note ? h("small", null, note) : null));
+    }));
+  }
+
   function renderDialog(me) {
     const d = $("dialog");
     d.innerHTML = "";
@@ -322,10 +366,10 @@
     if (needCurtain()) return;
     const pd = S.pending;
     let box = null;
-
     const online = mode === "online";
     const waiting = B.waitingFor(S);
     const iDecide = waiting.includes(me);
+    const blk = B.blockOptions(S, me);
 
     if (S.phase === "over") {
       const w = S.players[S.winner];
@@ -341,65 +385,54 @@
             h("button", { class: "btn big", onclick: () => start(true) }, "🌱 Jugar otra vez"),
             h("button", { class: "btn ghost", onclick: backToSetup }, "👥 Cambiar jugadores")));
       }
-    } else if (online && (S.phase === "challenge" || S.phase === "block") && !iDecide) {
+    } else if (S.phase === "action" && ui.dialog === "card") {
+      box = cardBox(me);
+    } else if (S.phase === "action" && ui.dialog === "target") {
+      box = targetBox(me);
+      d.classList.add("soft");
+    } else if (ui.dialog === "card" && S.phase !== "action" && !(online && (iDecide || blk.length))) {
+      box = cardBox(me);
+    } else if (online && S.phase === "challenge") {
       const c = pd.claim;
-      const actor = S.players[pd.actor].name;
-      let txt;
-      if (S.phase === "challenge") {
-        const who = c.claimant === me ? "Tú" : S.players[c.claimant].name;
-        txt = c.kind === "block" ? "🛡️ " + who + " bloquea con " + roleName(c.role) + ". ¿Alguien lo desafía?"
-          : "⭐ " + who + (c.claimant === me ? " usas " : " usa ") + roleName(c.role) + ". ¿Alguien lo desafiará?";
+      if (!iDecide && !blk.length) {
+        box = waitBox((c.kind === "block" ? "🛡️ " : "⭐ ") + claimText(pd, me) + ". ¿Alguien lo desafía?");
       } else {
-        txt = "🛡️ " + (pd.actor === me ? "Tu acción" : "La acción de " + actor) + " se puede bloquear. Esperando…";
+        const attacked = pd.target === me && c.kind === "action";
+        const title = blk.length ? (attacked ? "⚠️ ¡Te atacan! ¿Qué haces?" : "🤔 ¿Qué haces?") : "🤔 ¿Lo desafías?";
+        const others = waiting.filter((id) => id !== me).map((id) => S.players[id].name);
+        box = dbox(title, claimText(pd, me), claimCard(c.role),
+          iDecide ? h("button", { class: "btn warn big", onclick: () => act({ type: "challenge", player: me }) }, "❗ Desafiar", h("small", null, "Creo que no tiene " + roleName(c.role))) : null,
+          blk.length ? defendButtons(me, blk, true) : null,
+          iDecide ? h("button", { class: "btn ok big", onclick: () => act({ type: "pass", player: me }) }, blk.length ? "✓ No desafío" : "✓ Dejar pasar") : null,
+          !iDecide && others.length ? h("p", { class: "waiting-for" }, "⏳ Esperando a: " + others.join(", ")) : null);
       }
-      box = waitBox(txt);
+    } else if (online && S.phase === "block") {
+      if (!blk.length) {
+        box = waitBox("🛡️ " + (pd.actor === me ? "Tu acción" : "La acción de " + S.players[pd.actor].name) + " se puede bloquear.");
+      } else {
+        const a = B.ACTIONS[pd.action];
+        box = dbox(pd.target === me ? "⚠️ ¿Te defiendes?" : "🛡️ ¿Lo bloqueas?", S.players[pd.actor].name + ": " + a.name.toLowerCase() + targetName(pd, me),
+          defendButtons(me, blk, true),
+          h("button", { class: "btn big ok", onclick: () => act({ type: "pass", player: me }) }, "✓ No bloquear"));
+      }
     } else if (online && S.phase === "lose" && pd.loss.player !== me) {
       box = waitBox("💀 " + S.players[pd.loss.player].name + " está eligiendo qué planta pierde…");
     } else if (online && S.phase === "exchange" && pd.actor !== me) {
       box = waitBox("🌻 " + S.players[pd.actor].name + " está cambiando cartas con el mazo…");
-    } else if (online && S.phase === "challenge") {
-      const c = pd.claim;
-      const who = S.players[c.claimant].name;
-      const txt = c.kind === "block"
-        ? who + " bloquea con " + roleName(c.role)
-        : who + " usa " + roleName(c.role) + ": " + B.ACTIONS[pd.action].name.toLowerCase() + (pd.target != null ? " → " + (pd.target === me ? "tú" : S.players[pd.target].name) : "");
-      box = dbox("🤔 ¿Lo desafías?", txt,
-        h("button", { class: "claim-card", type: "button", onclick: () => zoom(IMG[c.role]) }, h("img", { src: IMG[c.role], alt: roleName(c.role) })),
-        h("div", { class: "row" },
-          h("button", { class: "btn warn big", onclick: () => act({ type: "challenge", player: me }) }, "❗ Desafiar"),
-          h("button", { class: "btn ok big", onclick: () => act({ type: "pass", player: me }) }, "✓ Dejar pasar")));
-    } else if (online && S.phase === "block") {
-      const a = B.ACTIONS[pd.action];
-      const grid = h("div", { class: "grid" });
-      a.blockedBy.forEach((r) => grid.append(h("button", { class: "btn role-" + r, onclick: () => act({ type: "block", player: me, role: r }) }, "🛡️ Bloquear", h("small", null, "con " + roleName(r)))));
-      box = dbox("🛡️ ¿Lo bloqueas?", S.players[pd.actor].name + ": " + a.name.toLowerCase() + (pd.target != null ? " → " + (pd.target === me ? "tú" : S.players[pd.target].name) : ""),
-        grid, h("button", { class: "btn big ok", onclick: () => act({ type: "pass", player: me }) }, "✓ No bloquear"));
-    } else if (S.phase === "action" && ui.dialog === "astucia") {
-      box = astuciaBox(me);
-    } else if (S.phase === "action" && ui.dialog === "tronco") {
-      box = troncoBox(me);
-    } else if (S.phase === "action" && ui.dialog === "target") {
-      box = targetBox(me);
-      d.classList.add("soft");
     } else if (S.phase === "challenge") {
+      // Modo prueba: todos en la misma pantalla.
       const c = pd.claim;
-      const who = S.players[c.claimant].name;
-      const txt = c.kind === "block"
-        ? who + " bloquea con " + roleName(c.role)
-        : who + " usa " + roleName(c.role) + ": " + B.ACTIONS[pd.action].name.toLowerCase() + (pd.target != null ? " → " + S.players[pd.target].name : "");
       const grid = h("div", { class: "grid" });
-      B.waitingFor(S).forEach((id) => grid.append(h("button", { class: "btn warn", onclick: () => act({ type: "challenge", player: id }) }, avatar(S.players[id], "tiny"), S.players[id].name + " desafía")));
-      box = dbox("🤔 ¿Alguien lo desafía?", txt,
-        h("button", { class: "claim-card", type: "button", onclick: () => zoom(IMG[c.role]) }, h("img", { src: IMG[c.role], alt: roleName(c.role) })),
-        grid,
+      waiting.forEach((id) => grid.append(h("button", { class: "btn warn", onclick: () => act({ type: "challenge", player: id }) }, avatar(S.players[id], "tiny"), S.players[id].name + " desafía")));
+      const defenders = S.players.filter((p) => B.blockOptions(S, p.id).length);
+      box = dbox("🤔 ¿Alguien lo desafía o se defiende?", claimText(pd, -1), claimCard(c.role), grid,
+        defenders.map((p) => defendButtons(p.id, B.blockOptions(S, p.id), false, true)),
         h("button", { class: "btn big ok", onclick: () => act({ type: "passAll" }) }, "✓ Nadie desafía"));
     } else if (S.phase === "block") {
       const a = B.ACTIONS[pd.action];
-      const grid = h("div", { class: "grid" });
-      B.waitingFor(S).forEach((id) => a.blockedBy.forEach((r) =>
-        grid.append(h("button", { class: "btn role-" + r, onclick: () => act({ type: "block", player: id, role: r }) }, "🛡️ " + S.players[id].name, h("small", null, "con " + roleName(r))))));
-      box = dbox("🛡️ ¿Alguien lo bloquea?", S.players[pd.actor].name + ": " + a.name.toLowerCase() + (pd.target != null ? " → " + S.players[pd.target].name : ""),
-        grid, h("button", { class: "btn big ok", onclick: () => act({ type: "passAll" }) }, "✓ Nadie bloquea"));
+      box = dbox("🛡️ ¿Alguien lo bloquea?", S.players[pd.actor].name + ": " + a.name.toLowerCase() + targetName(pd, -1),
+        waiting.map((id) => defendButtons(id, B.blockOptions(S, id), false, true)),
+        h("button", { class: "btn big ok", onclick: () => act({ type: "passAll" }) }, "✓ Nadie bloquea"));
     } else if (S.phase === "lose") {
       const p = S.players[pd.loss.player];
       const row = h("div", { class: "pick" });
@@ -426,41 +459,34 @@
     d.hidden = false;
   }
 
-  // Tocar una planta de tu mano.
-  function useRole(role) {
-    const me = viewer();
+  // Tu carta abierta en grande, con el botón para usar su habilidad.
+  function cardBox(me) {
+    const role = ui.role;
     const p = S.players[me];
-    const own = p.cards.some((c) => !c.lost && c.role === role);
-    const usable = B.availableActions(S, me).filter((a) => a.role === role && a.ok);
-    if (!usable.length) return;
-    if (usable.length > 1) { ui.dialog = "tronco"; ui.chosen = null; render(); return; }
-    if (!own) { ui.dialog = "astucia"; ui.chosen = usable[0].key; render(); return; }
-    go(usable[0].key);
+    const n = ownCount(p, role);
+    const myTurn = myTurnNow();
+    const acts = myTurn ? B.availableActions(S, me).filter((a) => a.role === role) : [];
+    const close = h("button", { class: "btn ghost", onclick: () => { ui.dialog = null; ui.role = null; render(); } }, "Cerrar");
+    const status = n
+      ? h("p", { class: "own-note" }, n > 1 ? "✓ Tienes " + n + " cartas de esta planta" : "✓ Tienes esta planta")
+      : h("p", { class: "astucia-note" }, "🦊 No la tienes, pero puedes usarla con astucia. Si alguien te desafía, pierdes una planta.");
+    const uses = acts.map((a) => h("button", {
+      class: "btn big role-" + role, disabled: !a.ok, onclick: () => go(a.key),
+    }, a.key === "soltarse" ? "🪢 Soltarme de la Enredadera" : (n ? "⭐ Usar: " : "🦊 Usar con astucia: ") + a.name.toLowerCase(),
+      h("small", null, a.ok ? (a.cost ? "Cuesta " + a.cost + " gotas" : "") : a.reason)));
+    return h("div", { class: "dbox card-open" },
+      ui.error ? h("p", { class: "error" }, "⚠️ " + ui.error) : null,
+      h("img", { class: "open-img" + (n ? "" : " gray"), src: IMG[role], alt: roleName(role) }),
+      status,
+      myTurn ? uses : h("p", { class: "sub center-text" }, "Podrás usarla en tu turno."),
+      close);
   }
 
-  // Ejecuta la habilidad (pide objetivo si hace falta).
+  // Ejecuta una habilidad (pide objetivo si hace falta).
   function go(key) {
     const a = B.ACTIONS[key];
     if (a.target) { ui.dialog = "target"; ui.chosen = key; render(); return; }
     act({ type: "action", player: viewer(), action: key });
-  }
-
-  function astuciaBox(me) {
-    const a = B.ACTIONS[ui.chosen];
-    return dbox("🦊 Usar con astucia", "No tienes " + roleName(a.role) + ", pero puedes usarla igual. Si alguien te desafía, pierdes una planta.",
-      h("button", { class: "claim-card", type: "button", onclick: () => zoom(IMG[a.role]) }, h("img", { src: IMG[a.role], alt: roleName(a.role) })),
-      h("p", { class: "sub center-text" }, a.name + (a.cost ? " · " + S.cfg[a.cost] + " gotas" : "")),
-      h("div", { class: "row" },
-        h("button", { class: "btn big role-" + a.role, onclick: () => go(ui.chosen) }, "🦊 Usar con astucia"),
-        h("button", { class: "btn ghost", onclick: () => { ui.dialog = null; ui.chosen = null; render(); } }, "Cancelar")));
-  }
-
-  function troncoBox(me) {
-    const own = S.players[me].cards.some((c) => !c.lost && c.role === "tronco");
-    const usable = B.availableActions(S, me).filter((a) => a.role === "tronco" && a.ok);
-    return dbox("🌳 Tronco Robusto", own ? "¿Qué quieres hacer?" : "🦊 No lo tienes: lo usas con astucia. Si alguien te desafía, pierdes una planta.",
-      h("div", { class: "grid" }, usable.map((a) => h("button", { class: "btn role-tronco", onclick: () => go(a.key) }, a.key === "soltarse" ? "🪢 Soltarme de la Enredadera" : "💧 Robar 2 gotas"))),
-      h("button", { class: "btn ghost", onclick: () => { ui.dialog = null; render(); } }, "Cancelar"));
   }
 
   function targetBox(me) {
@@ -548,7 +574,7 @@
     S = v.state;
     net.skew = Date.now() - v.state.now;
     if (fresh) Object.assign(ui, { error: "", dialog: S.phase === "action" ? ui.dialog : null, chosen: S.phase === "action" ? ui.chosen : null, exSel: S.phase === "exchange" ? ui.exSel : [] });
-    if (S.phase !== "action" || S.turn !== net.seat) { ui.dialog = null; ui.chosen = null; }
+    if ((S.phase !== "action" || S.turn !== net.seat) && ui.dialog !== "card") { ui.dialog = null; ui.chosen = null; }
     mode = "online";
     $("newGameBtn").textContent = "🚪 Salir de la sala";
     if ($("game").hidden) show("game");
@@ -749,6 +775,8 @@
   // ---------- arranque ----------
 
   $("startBtn").onclick = () => start(false);
+  $("actionCard").addEventListener("click", onActionCard);
+  $("charsBtn").onclick = () => zoom("assets/guia/personajes.webp");
   $("localBtn").onclick = () => { show("setup"); renderSetup(); };
   $("backHome").onclick = () => show("home");
   $("createBtn").onclick = createRoom;

@@ -13,7 +13,7 @@ Cada jugador ve solo sus cartas: la partida la guarda el servidor, no los móvil
 
 **📱 Modo prueba**: se juega pasando el móvil, con una pantalla "Pásale el móvil a…" entre turnos.
 
-- Mesa con los jugadores alrededor, el mazo al centro, tus cartas abajo, tu contador de gotas y 3 botones: 💧 refrescarse, 💧💧 ayuda y 🎯 exterminar. En tu mano ves las 5 plantas: a color las que tienes y en blanco y negro las que puedes usar con **astucia**. Toca una para usar su habilidad.
+- Mesa con los jugadores alrededor, el mazo al centro, tus cartas abajo, la carta de **Acciones por turno** siempre a la vista (en tu turno se tocan sus acciones) y tu mano con las 5 plantas: a color las que tienes y en blanco y negro las que puedes usar con **astucia**. Toca una planta para abrirla en grande y usar su habilidad. Botón 📋 para ver las habilidades de todos. Si te atacan, puedes defenderte (bloquear) en el mismo momento.
 - Botón **📖 Guía** con las cartas para pasar deslizando, y reglas rápidas.
 
 Pendiente: APK de Android.
