@@ -9,11 +9,11 @@ Juego de cartas de faroles para 2 a 10 jugadores. Cada jugador cuida un jardín 
 2. Los demás escriben el código y pulsan **Unirme**. Hasta 10 jugadores.
 3. Quien creó la sala pulsa **Empezar partida**.
 
-Cada jugador ve solo sus cartas: la partida la guarda el servidor, no los móviles. Para desafiar o bloquear hay 15 segundos; si nadie responde, el juego sigue solo. Si se recarga la página, vuelves a tu partida.
+Cada jugador ve solo sus cartas: la partida la guarda el servidor, no los móviles. Para desafiar o bloquear no hay límite de tiempo: el juego muestra a quién se está esperando. Si se recarga la página, vuelves a tu partida.
 
 **📱 Modo prueba**: se juega pasando el móvil, con una pantalla "Pásale el móvil a…" entre turnos.
 
-- Mesa con los jugadores alrededor, el mazo al centro, tus cartas abajo, tu contador de gotas y 4 botones: 💧 refrescarse, 💧💧 ayuda, 🎯 exterminar y ⭐ habilidad (las que no tienes se usan con **astucia**).
+- Mesa con los jugadores alrededor, el mazo al centro, tus cartas abajo, tu contador de gotas y 3 botones: 💧 refrescarse, 💧💧 ayuda y 🎯 exterminar. En tu mano ves las 5 plantas: a color las que tienes y en blanco y negro las que puedes usar con **astucia**. Toca una para usar su habilidad.
 - Botón **📖 Guía** con las cartas para pasar deslizando, y reglas rápidas.
 
 Pendiente: APK de Android.

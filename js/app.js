@@ -19,8 +19,6 @@
     habilidad: "assets/ui/habilidad.webp",
   };
   const COLORS = ["#e4572e", "#2e86de", "#f4a300", "#8e44ad", "#16a085", "#d35400", "#c2185b", "#3d5a80", "#6a9e1f", "#00838f"];
-  // Orden de las plantas en el menú de habilidades (como la guía).
-  const SKILL_ORDER = ["tronco", "soltarse", "girasol", "enredadera", "cactus", "carnivora"];
 
   const store = {
     get(k, d) { try { const v = localStorage.getItem("brotes." + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
@@ -228,14 +226,39 @@
     }
   }
 
+  // Orden de las plantas en tu mano (como la guía).
+  const HAND_ORDER = ["tronco", "girasol", "enredadera", "cactus", "carnivora"];
+
   function renderMe(me) {
     const p = S.players[me];
     const box = $("me");
     box.innerHTML = "";
     const see = canSee(me);
-    const hand = h("div", { class: "hand" });
-    if (p.status === "abono") hand.append(h("button", { type: "button", class: "card big face", onclick: () => zoom(IMG.abono) }, h("img", { src: IMG.abono, alt: "Abono" })));
-    if (p.status === "alive") p.cards.forEach((c) => { if (!c.lost) hand.append(cardEl(c, { size: "big", show: see })); });
+    const myTurn = S.phase === "action" && S.turn === me && !needCurtain();
+    const acts = myTurn ? B.availableActions(S, me) : [];
+    let hand;
+    if (p.status === "abono") {
+      hand = h("div", { class: "hand" }, h("button", { type: "button", class: "card big face", onclick: () => zoom(IMG.abono) }, h("img", { src: IMG.abono, alt: "Abono" })));
+    } else if (p.status === "alive" && see) {
+      // Las 5 plantas: a color las que tienes, en blanco y negro las que puedes usar con astucia.
+      hand = h("div", { class: "hand5" + (myTurn ? " my-turn" : "") });
+      for (const role of HAND_ORDER) {
+        const n = p.cards.filter((c) => !c.lost && c.role === role).length;
+        const usable = acts.filter((a) => a.role === role && a.ok);
+        const blocked = myTurn && !usable.length;
+        hand.append(h("button", {
+          type: "button",
+          class: "pcard " + (n ? "own" : "astucia") + (myTurn && usable.length ? " ready" : "") + (blocked ? " blocked" : ""),
+          "aria-label": roleName(role) + (n ? " (la tienes)" : " (astucia)"),
+          onclick: () => (myTurn && usable.length ? useRole(role) : zoom(IMG[role])),
+        },
+          h("img", { src: IMG[role], alt: "" }),
+          h("span", { class: "pc-tag" }, n ? (n > 1 ? "✓ x" + n : "✓ Tuya") : "🦊 Astucia")));
+      }
+    } else {
+      hand = h("div", { class: "hand" });
+      if (p.status === "alive") p.cards.forEach((c) => { if (!c.lost) hand.append(cardEl(c, { size: "big", show: see })); });
+    }
     const lost = p.status === "alive" ? p.cards.filter((c) => c.lost) : [];
     box.append(hand);
     const tag = h("div", { class: "me-tag" + (S.turn === me && S.phase !== "over" ? " turn" : "") }, avatar(p, "small"), p.name);
@@ -257,7 +280,6 @@
     const myTurn = S.phase === "action" && S.turn === me && !needCurtain();
     const acts = myTurn ? B.availableActions(S, me) : [];
     const get = (k) => acts.find((a) => a.key === k);
-    const skillsOk = acts.some((a) => a.role && a.ok);
     const btn = (icon, label, ok, why, fn) => h("button", {
       type: "button", class: "abtn" + (ok ? "" : " off"), disabled: !ok, title: why || label, onclick: fn,
     }, h("img", { src: ICON[icon], alt: "" }), h("span", null, label));
@@ -266,28 +288,22 @@
       btn("gota", "Refrescarse", r && r.ok, r && r.reason, () => act({ type: "action", player: me, action: "refrescar" })),
       btn("gotas2", "Ayuda", a && a.ok, a && a.reason, () => act({ type: "action", player: me, action: "ayuda" })),
       btn("diana", "Exterminar", x && x.ok, x && x.reason, () => { ui.dialog = "target"; ui.chosen = "exterminar"; render(); }),
-      btn("habilidad", "Habilidad", skillsOk, null, () => { ui.dialog = "skills"; render(); }),
     );
     if (myTurn) {
       const p = S.players[me];
-      const hint = p.water >= S.cfg.forceAt ? "⚠️ Tienes " + p.water + " gotas: debes exterminar" : "Tu turno: elige una acción";
+      const hint = p.water >= S.cfg.forceAt ? "⚠️ Tienes " + p.water + " gotas: debes exterminar" : "Tu turno: elige una acción o toca una planta";
       box.prepend(h("div", { class: "turn-hint" }, hint));
     } else if (S.phase === "action" && mode === "online") {
       box.prepend(h("div", { class: "turn-hint" }, "Turno de " + S.players[S.turn].name + "…"));
     }
   }
 
-  // Segundos que quedan para desafiar o bloquear (solo online).
-  function secondsLeft() {
-    if (mode !== "online" || !S || !S._deadline) return null;
-    return Math.max(0, Math.ceil((S._deadline - (Date.now() - net.skew)) / 1000));
-  }
-  const timerEl = () => h("span", { class: "timer", "data-timer": "1" }, "⏱ " + (secondsLeft() ?? "") + "s");
-
   // Ventana para quien no tiene que decidir nada ahora (online).
   function waitBox(text) {
     $("dialog").classList.add("soft");
-    return h("div", { class: "dbox wait" }, h("p", { class: "sub" }, text), mode === "online" && S._deadline ? timerEl() : null);
+    const names = B.waitingFor(S).map((id) => (id === net.seat ? "ti" : S.players[id].name));
+    return h("div", { class: "dbox wait" }, h("p", { class: "sub" }, text),
+      names.length ? h("p", { class: "waiting-for" }, "⏳ Esperando a: " + names.join(", ")) : null);
   }
 
   // ---------- ventanas ----------
@@ -332,7 +348,7 @@
       if (S.phase === "challenge") {
         const who = c.claimant === me ? "Tú" : S.players[c.claimant].name;
         txt = c.kind === "block" ? "🛡️ " + who + " bloquea con " + roleName(c.role) + ". ¿Alguien lo desafía?"
-          : "⭐ " + who + (c.claimant === me ? " usas " : " usa ") + roleName(c.role) + ". Esperando a ver si alguien desafía…";
+          : "⭐ " + who + (c.claimant === me ? " usas " : " usa ") + roleName(c.role) + ". ¿Alguien lo desafiará?";
       } else {
         txt = "🛡️ " + (pd.actor === me ? "Tu acción" : "La acción de " + actor) + " se puede bloquear. Esperando…";
       }
@@ -351,16 +367,17 @@
         h("button", { class: "claim-card", type: "button", onclick: () => zoom(IMG[c.role]) }, h("img", { src: IMG[c.role], alt: roleName(c.role) })),
         h("div", { class: "row" },
           h("button", { class: "btn warn big", onclick: () => act({ type: "challenge", player: me }) }, "❗ Desafiar"),
-          h("button", { class: "btn ok big", onclick: () => act({ type: "pass", player: me }) }, "✓ Dejar pasar")),
-        timerEl());
+          h("button", { class: "btn ok big", onclick: () => act({ type: "pass", player: me }) }, "✓ Dejar pasar")));
     } else if (online && S.phase === "block") {
       const a = B.ACTIONS[pd.action];
       const grid = h("div", { class: "grid" });
       a.blockedBy.forEach((r) => grid.append(h("button", { class: "btn role-" + r, onclick: () => act({ type: "block", player: me, role: r }) }, "🛡️ Bloquear", h("small", null, "con " + roleName(r)))));
       box = dbox("🛡️ ¿Lo bloqueas?", S.players[pd.actor].name + ": " + a.name.toLowerCase() + (pd.target != null ? " → " + (pd.target === me ? "tú" : S.players[pd.target].name) : ""),
-        grid, h("button", { class: "btn big ok", onclick: () => act({ type: "pass", player: me }) }, "✓ No bloquear"), timerEl());
-    } else if (S.phase === "action" && ui.dialog === "skills") {
-      box = skillsBox(me);
+        grid, h("button", { class: "btn big ok", onclick: () => act({ type: "pass", player: me }) }, "✓ No bloquear"));
+    } else if (S.phase === "action" && ui.dialog === "astucia") {
+      box = astuciaBox(me);
+    } else if (S.phase === "action" && ui.dialog === "tronco") {
+      box = troncoBox(me);
     } else if (S.phase === "action" && ui.dialog === "target") {
       box = targetBox(me);
       d.classList.add("soft");
@@ -409,31 +426,41 @@
     d.hidden = false;
   }
 
-  function skillsBox(me) {
+  // Tocar una planta de tu mano.
+  function useRole(role) {
+    const me = viewer();
     const p = S.players[me];
-    const acts = B.availableActions(S, me).filter((a) => a.role);
-    acts.sort((x, y) => SKILL_ORDER.indexOf(x.key) - SKILL_ORDER.indexOf(y.key));
-    const list = h("div", { class: "skills" });
-    for (const a of acts) {
-      const has = !a.bluff;
-      list.append(h("button", {
-        type: "button",
-        class: "skill role-" + a.role + (a.ok ? "" : " off"),
-        disabled: !a.ok,
-        onclick: () => {
-          if (a.target) { ui.dialog = "target"; ui.chosen = a.key; render(); }
-          else act({ type: "action", player: me, action: a.key });
-        },
-      },
-        h("img", { src: IMG[a.role], alt: "" }),
-        h("span", { class: "sk-text" },
-          h("b", null, roleName(a.role)),
-          h("span", null, a.name + (a.cost ? " · " + a.cost + " gotas" : "")),
-          !a.ok ? h("small", null, a.reason) : null),
-        h("em", { class: has ? "has" : "astucia" }, has ? "✓ La tienes" : "🦊 Astucia")));
-    }
-    return dbox("⭐ Usa una habilidad", "Puedes usar la tuya o cualquier otra con astucia. Si alguien te desafía y no la tienes, pierdes una planta.",
-      list, h("button", { class: "btn ghost", onclick: () => { ui.dialog = null; render(); } }, "← Volver"));
+    const own = p.cards.some((c) => !c.lost && c.role === role);
+    const usable = B.availableActions(S, me).filter((a) => a.role === role && a.ok);
+    if (!usable.length) return;
+    if (usable.length > 1) { ui.dialog = "tronco"; ui.chosen = null; render(); return; }
+    if (!own) { ui.dialog = "astucia"; ui.chosen = usable[0].key; render(); return; }
+    go(usable[0].key);
+  }
+
+  // Ejecuta la habilidad (pide objetivo si hace falta).
+  function go(key) {
+    const a = B.ACTIONS[key];
+    if (a.target) { ui.dialog = "target"; ui.chosen = key; render(); return; }
+    act({ type: "action", player: viewer(), action: key });
+  }
+
+  function astuciaBox(me) {
+    const a = B.ACTIONS[ui.chosen];
+    return dbox("🦊 Usar con astucia", "No tienes " + roleName(a.role) + ", pero puedes usarla igual. Si alguien te desafía, pierdes una planta.",
+      h("button", { class: "claim-card", type: "button", onclick: () => zoom(IMG[a.role]) }, h("img", { src: IMG[a.role], alt: roleName(a.role) })),
+      h("p", { class: "sub center-text" }, a.name + (a.cost ? " · " + S.cfg[a.cost] + " gotas" : "")),
+      h("div", { class: "row" },
+        h("button", { class: "btn big role-" + a.role, onclick: () => go(ui.chosen) }, "🦊 Usar con astucia"),
+        h("button", { class: "btn ghost", onclick: () => { ui.dialog = null; ui.chosen = null; render(); } }, "Cancelar")));
+  }
+
+  function troncoBox(me) {
+    const own = S.players[me].cards.some((c) => !c.lost && c.role === "tronco");
+    const usable = B.availableActions(S, me).filter((a) => a.role === "tronco" && a.ok);
+    return dbox("🌳 Tronco Robusto", own ? "¿Qué quieres hacer?" : "🦊 No lo tienes: lo usas con astucia. Si alguien te desafía, pierdes una planta.",
+      h("div", { class: "grid" }, usable.map((a) => h("button", { class: "btn role-tronco", onclick: () => go(a.key) }, a.key === "soltarse" ? "🪢 Soltarme de la Enredadera" : "💧 Robar 2 gotas"))),
+      h("button", { class: "btn ghost", onclick: () => { ui.dialog = null; render(); } }, "Cancelar"));
   }
 
   function targetBox(me) {
@@ -443,7 +470,7 @@
       grid.append(h("button", { class: "btn target", onclick: () => act({ type: "action", player: me, action: ui.chosen, target: q.id }) },
         h("span", { class: "trow" }, avatar(q, "tiny"), q.name), h("small", null, "💧 " + q.water + " · " + B.liveCards(q).length + (B.liveCards(q).length === 1 ? " planta" : " plantas")))));
     return dbox("🎯 " + a.name + ": ¿a quién?", "Toca un jugador aquí o en la mesa.", grid,
-      h("button", { class: "btn ghost", onclick: () => { ui.dialog = a.role ? "skills" : null; ui.chosen = null; render(); } }, "← Volver"));
+      h("button", { class: "btn ghost", onclick: () => { ui.dialog = null; ui.chosen = null; render(); } }, "← Volver"));
   }
 
   function renderCurtain(me) {
@@ -650,17 +677,6 @@
     }
   }
 
-  // Cuenta atrás de desafíos y bloqueos; al terminar se avisa al servidor.
-  setInterval(() => {
-    if (mode !== "online" || !S) return;
-    const left = secondsLeft();
-    document.querySelectorAll("[data-timer]").forEach((el) => { el.textContent = "⏱ " + left + "s"; });
-    if (left === 0 && S._deadline && net.sentTimeout !== S._deadline && !net.busy) {
-      net.sentTimeout = S._deadline;
-      netCall("move", { move: { type: "timeout" } }).then(applyView).catch(() => {});
-    }
-  }, 250);
-
   document.addEventListener("visibilitychange", () => { if (!document.hidden && mode === "online") refresh(); });
 
   // ---------- guía, carta en grande y menú ----------
@@ -677,8 +693,8 @@
     { tab: "Reglas", html:
       "<h3>📜 Reglas rápidas</h3><ul>" +
       "<li><b>Inicio:</b> cada jugador recibe 2 cartas boca abajo y 2 gotas.</li>" +
-      "<li><b>En tu turno</b> haces una sola acción: 💧 refrescarte (+1), 💧💧 pedir ayuda (+2), 🎯 exterminar (8 gotas) o ⭐ usar una habilidad.</li>" +
-      "<li><b>Astucia:</b> puedes usar la habilidad de cualquier planta, la tengas o no.</li>" +
+      "<li><b>En tu turno</b> haces una sola acción: 💧 refrescarte (+1), 💧💧 pedir ayuda (+2), 🎯 exterminar (8 gotas) o tocar una de tus plantas para usar su habilidad.</li>" +
+      "<li><b>Tu mano:</b> abajo ves las 5 plantas. A color, las que tienes; en blanco y negro, las que puedes usar con <b>astucia</b> aunque no las tengas.</li>" +
       "<li><b>Desafiar:</b> si crees que alguien no tiene la planta que dice, desafíalo. Si no la tenía, pierde una planta. Si la tenía, pierdes tú una planta y él cambia esa carta por otra del mazo.</li>" +
       "<li><b>Bloquear:</b> también se bloquea diciendo tener una planta, y el bloqueo también se puede desafiar.</li>" +
       "<li><b>Con 11 gotas o más</b> es obligatorio exterminar.</li>" +

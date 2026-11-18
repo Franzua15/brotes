@@ -192,7 +192,7 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 
 .actions {
   position: absolute; z-index: 3; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom));
-  display: grid; grid-template-columns: repeat(2, auto); gap: 6px; justify-items: center;
+  display: grid; grid-template-columns: repeat(3, auto); gap: 6px; justify-items: center;
 }
 .turn-hint {
   grid-column: 1 / -1; background: rgba(20, 50, 25, .85); color: #fff; font-size: .78rem;
@@ -301,12 +301,12 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 @media (orientation: portrait) {
 
   .me { bottom: calc(112px + env(safe-area-inset-bottom)); }
-  .water-badge { bottom: calc(132px + env(safe-area-inset-bottom)); }
+  .water-badge { bottom: calc(106px + env(safe-area-inset-bottom)); }
   .water-badge img { height: 46px; }
   .big-num { font-size: 1.4rem; min-width: 48px; padding: 1px 12px 1px 20px; margin-left: -14px; }
   .actions {
     left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom));
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
   }
   .abtn { width: 100%; }
   .turn-hint { max-width: none; }
@@ -361,3 +361,36 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
 .dbox.wait .sub { margin: 0; color: var(--ink); }
 .setup-box { grid-template-columns: minmax(0, 1fr); }
 .join-row .code-input { min-width: 0; width: 100%; }
+
+/* ---------- tu mano: las 5 plantas ---------- */
+.hand5 { display: flex; justify-content: center; align-items: flex-end; gap: 5px; }
+.pcard {
+  position: relative; flex: none; padding: 0; border: 0; background: none;
+  width: clamp(54px, min(17.5vw, 13dvh), 112px); aspect-ratio: 2 / 3;
+  border-radius: 9px; overflow: visible;
+  transition: transform .15s ease, filter .15s ease;
+}
+.pcard img { display: block; width: 100%; height: 100%; object-fit: cover; border-radius: 9px; box-shadow: 0 4px 10px rgba(0, 0, 0, .35); }
+.pcard.astucia img { filter: grayscale(1) brightness(.92) contrast(.95); }
+.pcard.own img { outline: 3px solid #fff; }
+.pcard.ready { transform: translateY(-6px); }
+.pcard.ready.own img { box-shadow: 0 0 0 3px var(--gold), 0 8px 16px rgba(0, 0, 0, .4); }
+.pcard.ready:active { transform: translateY(-2px) scale(.97); }
+.pcard.blocked { opacity: .55; }
+.pc-tag {
+  position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%);
+  white-space: nowrap; font-size: .62rem; line-height: 1; padding: 3px 6px; border-radius: 99px;
+  border: 2px solid #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, .3);
+}
+.pcard.own .pc-tag { background: #1c7a32; color: #fff; }
+.pcard.astucia .pc-tag { background: #ffe9a8; color: #7a4a00; }
+.me .me-tag { margin-top: 4px; }
+.center-text { text-align: center; }
+.waiting-for { margin: 0; font-size: .82rem; color: var(--muted); font-weight: 500; }
+@media (orientation: landscape) and (max-height: 519px) {
+  .pcard { width: clamp(46px, 17dvh, 70px); }
+  .pc-tag { font-size: .55rem; }
+}
+@media (min-width: 900px) and (min-height: 600px) {
+  .pc-tag { font-size: .75rem; }
+}

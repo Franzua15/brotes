@@ -7,7 +7,6 @@ import "./engine.js";
 const B = (globalThis as any).Brotes;
 const SB_URL = Deno.env.get("SUPABASE_URL")!;
 const SB_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const WINDOW_MS = 15000; // tiempo para desafiar o bloquear
 const MAX_PLAYERS = 10;
 
 const CORS = {
@@ -84,14 +83,6 @@ function newCode(): string {
   return c;
 }
 
-// Abre una ventana de 15 s cuando empieza un desafío o un bloqueo nuevo.
-// deno-lint-ignore no-explicit-any
-function stampWindow(s: any) {
-  if (s.phase !== "challenge" && s.phase !== "block") { delete s._deadline; delete s._wkey; return; }
-  const key = s.phase + JSON.stringify(s.pending.claim) + JSON.stringify(s.pending.blockers || null) + s.log.length;
-  if (s._wkey !== key) { s._wkey = key; s._deadline = Date.now() + WINDOW_MS; }
-}
-
 function publicView(room: Room, seat: number) {
   return {
     room: { code: room.code, status: room.status, players: room.players.map((p) => p.name), host: 0, version: room.version },
@@ -165,21 +156,14 @@ async function handle(body: any) {
       const seat = seatOf(room, token);
       if (room.status !== "playing" || !room.state) fail("La partida no está en curso.");
       const move = body.move || {};
+      // Sin límite de tiempo: cada jugador responde cuando quiere.
+      if (move.type === "passAll" || move.type === "timeout") fail("Jugada no permitida.");
       let next;
-      if (move.type === "timeout") {
-        const s = room.state;
-        const due = (s.phase === "challenge" || s.phase === "block") && s._deadline && Date.now() >= s._deadline - 300;
-        if (!due) return publicView(room, seat);
-        next = B.dispatch(s, { type: "passAll" });
-      } else {
-        if (move.type === "passAll") fail("Jugada no permitida.");
-        try {
-          next = B.dispatch(room.state, { ...move, player: seat });
-        } catch (e) {
-          fail((e as Error).message);
-        }
+      try {
+        next = B.dispatch(room.state, { ...move, player: seat });
+      } catch (e) {
+        fail((e as Error).message);
       }
-      stampWindow(next);
       const saved = await saveRoom(room, { state: next, status: next.phase === "over" ? "over" : "playing" });
       if (!saved) continue;
       await notify(code, saved.version);
