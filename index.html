@@ -79,12 +79,14 @@
   <!-- Zona de abajo: carta de acciones a un lado y tu mano -->
   <div id="bottom" class="bottom">
     <div class="side">
-      <div id="actionCard" class="action-card">
-        <img src="assets/guia/acciones.webp" alt="Acciones por turno">
-        <button type="button" class="ac-row r1" data-act="refrescar" aria-label="Refrescarse: gana 1 gota"></button>
-        <button type="button" class="ac-row r2" data-act="ayuda" aria-label="Pedir ayuda a la naturaleza: toma 2 gotas"></button>
-        <button type="button" class="ac-row r3" data-act="exterminar" aria-label="Exterminar: paga 8 gotas"></button>
-        <button type="button" class="ac-row r4" data-act="habilidad" aria-label="Usar la habilidad de una planta"></button>
+      <button type="button" id="actionCard" class="action-card" aria-label="Ver la carta de acciones en grande">
+        <img src="assets/ui/acciones.webp" alt="Acciones por turno">
+      </button>
+      <div id="actIcons" class="act-icons">
+        <button type="button" class="act-icon" data-act="refrescar" aria-label="1. Refrescarse"><img src="assets/ui/gota.webp" alt=""><i>1</i></button>
+        <button type="button" class="act-icon" data-act="ayuda" aria-label="2. Pedir ayuda a la naturaleza"><img src="assets/ui/gotas2.webp" alt=""><i>2</i></button>
+        <button type="button" class="act-icon" data-act="exterminar" aria-label="3. Exterminar"><img src="assets/ui/diana.webp" alt=""><i>3</i></button>
+        <button type="button" class="act-icon" data-act="habilidad" aria-label="4. Usar la habilidad de una planta"><img src="assets/ui/habilidad.webp" alt=""><i>4</i></button>
       </div>
     </div>
     <div class="mine">

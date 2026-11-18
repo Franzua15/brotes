@@ -491,3 +491,33 @@ button:focus-visible, input:focus-visible { outline: 3px solid var(--gold); outl
   .me-water { font-size: 1rem; }
   .me-water img { height: 20px; }
 }
+
+/* ---------- carta de acciones + iconos al lado ---------- */
+.side { flex-direction: row; align-items: flex-end; gap: 6px; }
+.action-card { padding: 0; border: 0; background: none; width: clamp(120px, min(34vw, 30dvh), 250px); cursor: zoom-in; }
+.action-card img { box-shadow: none; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .4)); border-radius: 0; }
+.action-card.active img { box-shadow: none; filter: drop-shadow(0 0 6px rgba(255, 215, 80, .95)) drop-shadow(0 6px 10px rgba(0, 0, 0, .4)); }
+.act-icons { display: flex; flex-direction: column; gap: 6px; padding-bottom: 4px; }
+.act-icon {
+  position: relative; width: clamp(46px, 7.5dvh, 66px); aspect-ratio: 1; padding: 4px;
+  border: 0; background: none; display: grid; place-items: center;
+  transition: transform .12s, filter .12s;
+}
+.act-icon img { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .35)); }
+.act-icon i {
+  position: absolute; left: -2px; top: -2px; font-style: normal; font-size: .7rem; line-height: 1;
+  background: #fff; color: var(--navy); border-radius: 99px; padding: 2px 5px; box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+}
+.act-icon.off { filter: grayscale(1) opacity(.5); }
+.act-icon.ok { animation: iconpulse 1.6s ease-in-out infinite; }
+.act-icon.ok:active { transform: scale(.9); }
+@keyframes iconpulse { 50% { transform: scale(1.08); filter: drop-shadow(0 0 8px rgba(255, 215, 80, .95)); } }
+@media (orientation: portrait) {
+  .action-card { width: clamp(104px, 30vw, 160px); }
+  .act-icon { width: clamp(40px, 11vw, 56px); }
+  .mine .pcard { width: clamp(42px, calc((100vw - 30vw - 11vw - 60px) / 3), 92px); }
+}
+@media (orientation: landscape) and (max-height: 519px) {
+  .action-card { width: clamp(80px, 28dvh, 120px); }
+  .act-icon { width: clamp(34px, 11dvh, 46px); }
+}

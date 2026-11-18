@@ -205,7 +205,7 @@
       const p = S.players[(me + k) % n];
       // Repartidos en arco alrededor de la mesa, de izquierda a derecha por arriba.
       const a = Math.PI - spread + (k * (Math.PI + 2 * spread)) / n;
-      const x = 50 + Math.cos(a) * (short ? 37 : 41);
+      const x = 50 + Math.cos(a) * (short ? 31 : 41);
       const y = cy + Math.sin(a) * ry;
       const pickable = picking && p.status === "alive";
       const seat = h(pickable ? "button" : "div", {
@@ -283,14 +283,15 @@
   function renderActions(me) {
     const myTurn = myTurnNow();
     const acts = myTurn ? B.availableActions(S, me) : [];
-    const card = $("actionCard");
-    card.classList.toggle("active", myTurn);
-    card.querySelectorAll(".ac-row").forEach((row) => {
-      const k = row.dataset.act;
+    $("actionCard").classList.toggle("active", myTurn);
+    $("actIcons").classList.toggle("active", myTurn);
+    document.querySelectorAll(".act-icon").forEach((btn) => {
+      const k = btn.dataset.act;
       const a = acts.find((x) => x.key === k);
       const ok = k === "habilidad" ? acts.some((x) => x.role && x.ok) : !!(a && a.ok);
-      row.classList.toggle("ok", myTurn && ok);
-      row.classList.toggle("off", myTurn && !ok);
+      btn.classList.toggle("ok", myTurn && ok);
+      btn.classList.toggle("off", !myTurn || !ok);
+      btn.title = myTurn && !ok && a ? a.reason : btn.getAttribute("aria-label");
     });
   }
 
@@ -301,12 +302,13 @@
     ev.classList.remove("flash", "warn"); void ev.offsetWidth; ev.classList.add("warn");
   }
 
-  function onActionCard(e) {
-    if (!S) return;
-    const row = e.target.closest(".ac-row");
-    if (!row || !myTurnNow()) { zoom("assets/guia/acciones.webp"); return; }
+  // Iconos de acción junto a la carta.
+  function onActionIcon(e) {
+    const btn = e.target.closest(".act-icon");
+    if (!btn || !S) return;
+    if (!myTurnNow()) { flashHint("⏳ Espera tu turno"); return; }
     const me = viewer();
-    const k = row.dataset.act;
+    const k = btn.dataset.act;
     const acts = B.availableActions(S, me);
     if (k === "habilidad") {
       const hand = document.querySelector(".hand5");
@@ -709,7 +711,7 @@
 
   const SLIDES = [
     { tab: "Personajes", img: "assets/guia/personajes.webp" },
-    { tab: "Acciones", img: "assets/guia/acciones.webp" },
+    { tab: "Acciones", img: "assets/ui/acciones.webp" },
     { tab: "🌳", img: IMG.tronco },
     { tab: "🌻", img: IMG.girasol },
     { tab: "🌿", img: IMG.enredadera },
@@ -775,7 +777,8 @@
   // ---------- arranque ----------
 
   $("startBtn").onclick = () => start(false);
-  $("actionCard").addEventListener("click", onActionCard);
+  $("actionCard").addEventListener("click", () => zoom("assets/ui/acciones.webp"));
+  $("actIcons").addEventListener("click", onActionIcon);
   $("charsBtn").onclick = () => zoom("assets/guia/personajes.webp");
   $("localBtn").onclick = () => { show("setup"); renderSetup(); };
   $("backHome").onclick = () => show("home");
